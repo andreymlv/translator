@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "translator",
+  "gui",
+  "cli",
+]
+resolver = "2"
