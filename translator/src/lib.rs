@@ -62,16 +62,6 @@ pub enum Token {
     Semicolon,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-pub enum BuiltIn {
-    Plus,
-    Minus,
-    Times,
-    Divide,
-    Equal,
-    Not,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
