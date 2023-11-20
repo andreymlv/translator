@@ -2,6 +2,7 @@ use crate::ast::AstBinaryExpression;
 use crate::ast::AstBinaryOperatorKind;
 use crate::ast::AstNumberExpression;
 use crate::ast::AstVisitor;
+use crate::text::span::Span;
 
 pub struct AstEvaluator {
     pub last_value: Option<i32>,
@@ -30,5 +31,13 @@ impl AstVisitor for AstEvaluator {
             AstBinaryOperatorKind::Divide => left / right,
             AstBinaryOperatorKind::Mod => left % right,
         });
+    }
+
+    fn visit_error(&mut self, _span: &Span) {
+        todo!()
+    }
+
+    fn visit_assign_statement(&mut self, _statement: &super::AstAssignStatement) {
+        todo!()
     }
 }

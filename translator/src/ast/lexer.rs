@@ -1,8 +1,13 @@
-use logos::{Logos, Span};
+use logos::Logos;
+
+use crate::text::span::Span;
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(skip r"[ \t\n\f]+")]
 pub enum TokenKind {
+    #[end]
+    EOF,
+
     #[token("Int")]
     Int,
     #[token("Float")]
@@ -68,6 +73,8 @@ pub enum TokenKind {
     False,
     #[token(";")]
     Semicolon,
+    #[token(",")]
+    Comma,
 }
 
 #[derive(Debug, Clone)]

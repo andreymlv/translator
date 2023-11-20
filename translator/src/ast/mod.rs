@@ -1,4 +1,9 @@
+use std::ops::Range;
+
+use crate::text::span::Span;
+
 use self::lexer::Token;
+use colored::*;
 
 pub mod evaluator;
 pub mod lexer;
@@ -26,8 +31,11 @@ impl Ast {
     }
 
     pub fn visualize(&self) -> () {
-        let mut printer = AstPrinter { indent: 0 };
+        let mut printer = AstPrinter {
+            result: String::new(),
+        };
         self.visit(&mut printer);
+        println!("{}", printer.result)
     }
 }
 
@@ -37,6 +45,7 @@ pub trait AstVisitor {
             AstStatementKind::Expression(expr) => {
                 self.visit_expression(expr);
             }
+            AstStatementKind::AssignStatement(statement) => self.visit_assign_statement(statement),
         }
     }
     fn visit_statement(&mut self, statement: &AstStatement) {
@@ -53,13 +62,19 @@ pub trait AstVisitor {
             AstExpressionKind::Parenthesized(expr) => {
                 self.visit_parenthesized_expression(expr);
             }
+            AstExpressionKind::Error(span) => self.visit_error(span),
+            AstExpressionKind::Variable(expr) => todo!(),
         }
     }
     fn visit_expression(&mut self, expression: &AstExpression) {
         self.do_visit_expression(expression);
     }
 
+    fn visit_assign_statement(&mut self, statement: &AstAssignStatement);
+
     fn visit_number(&mut self, number: &AstNumberExpression);
+
+    fn visit_error(&mut self, span: &Span);
 
     fn visit_binary_expression(&mut self, binary_expression: &AstBinaryExpression) {
         self.visit_expression(&binary_expression.left);
@@ -75,57 +90,76 @@ pub trait AstVisitor {
 }
 
 pub struct AstPrinter {
-    indent: usize,
+    result: String,
 }
-const LEVEL_INDENT: usize = 2;
+
+impl AstPrinter {
+    fn add_whitespace(&mut self) {
+        self.result.push_str(" ")
+    }
+    fn add_newline(&mut self) {
+        self.result.push_str("\n")
+    }
+}
 
 impl AstVisitor for AstPrinter {
     fn visit_statement(&mut self, statement: &AstStatement) {
-        self.print_with_indent("Statement:");
-        self.indent += LEVEL_INDENT;
         AstVisitor::do_visit_statement(self, statement);
-        self.indent -= LEVEL_INDENT;
+        self.add_newline();
     }
 
     fn visit_expression(&mut self, expression: &AstExpression) {
-        self.print_with_indent("Expression:");
-        self.indent += LEVEL_INDENT;
         AstVisitor::do_visit_expression(self, expression);
-        self.indent -= LEVEL_INDENT;
     }
 
     fn visit_number(&mut self, number: &AstNumberExpression) {
-        self.print_with_indent(&format!("Number: {}", number.number));
+        self.result
+            .push_str(&format!("{}", number.number.to_string().cyan()));
     }
 
     fn visit_binary_expression(&mut self, binary_expression: &AstBinaryExpression) {
-        self.print_with_indent("Binary Expression:");
-        self.indent += LEVEL_INDENT;
-        self.print_with_indent(&format!("Operator: {:?}", binary_expression.operator.kind));
         self.visit_expression(&binary_expression.left);
+        self.add_whitespace();
+        self.result.push_str(&format!(
+            "{}",
+            binary_expression.operator.token.lexeme.white()
+        ));
+        self.add_whitespace();
         self.visit_expression(&binary_expression.right);
-        self.indent -= LEVEL_INDENT;
     }
 
     fn visit_parenthesized_expression(
         &mut self,
         parenthesized_expression: &AstParenthesizedExpression,
     ) {
-        self.print_with_indent("Parenthesized Expression:");
-        self.indent += LEVEL_INDENT;
+        self.result.push_str("(");
         self.visit_expression(&parenthesized_expression.expression);
-        self.indent -= LEVEL_INDENT;
+        self.result.push_str(")");
     }
-}
 
-impl AstPrinter {
-    fn print_with_indent(&mut self, text: &str) {
-        println!("{}{}", " ".repeat(self.indent), text);
+    fn visit_error(&mut self, span: &Span) {
+        self.result.push_str(&format!("{}", span.literal.red()));
+    }
+
+    fn visit_assign_statement(&mut self, statement: &AstAssignStatement) {
+        self.result
+            .push_str(&format!("{}", statement.identifier.lexeme.green()));
+        self.add_whitespace();
+        self.result.push_str(":=");
+        self.add_whitespace();
+        self.visit_expression(&statement.initializer);
+        self.result.push_str(";");
     }
 }
 
 pub enum AstStatementKind {
     Expression(AstExpression),
+    AssignStatement(AstAssignStatement),
+}
+
+pub struct AstAssignStatement {
+    identifier: Token,
+    initializer: AstExpression,
 }
 
 pub struct AstStatement {
@@ -140,12 +174,21 @@ impl AstStatement {
     pub fn expression(expr: AstExpression) -> Self {
         AstStatement::new(AstStatementKind::Expression(expr))
     }
+
+    pub fn assign_statement(identifier: Token, initializer: AstExpression) -> Self {
+        AstStatement::new(AstStatementKind::AssignStatement(AstAssignStatement {
+            identifier,
+            initializer,
+        }))
+    }
 }
 
 pub enum AstExpressionKind {
     Number(AstNumberExpression),
     Binary(AstBinaryExpression),
     Parenthesized(AstParenthesizedExpression),
+    Variable(AstVariableExpression),
+    Error(Span),
 }
 
 #[derive(Debug)]
@@ -192,6 +235,16 @@ pub struct AstParenthesizedExpression {
     expression: Box<AstExpression>,
 }
 
+pub struct AstVariableExpression {
+    identifier: Token,
+}
+
+impl AstVariableExpression {
+    pub fn identifier(&self) -> &str {
+        &self.identifier.lexeme
+    }
+}
+
 pub struct AstExpression {
     kind: AstExpressionKind,
 }
@@ -219,5 +272,9 @@ impl AstExpression {
                 expression: Box::new(expression),
             },
         ))
+    }
+
+    fn error(span: Span) -> AstExpression {
+        AstExpression::new(AstExpressionKind::Error(span))
     }
 }
